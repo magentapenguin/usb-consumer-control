@@ -5,21 +5,6 @@
 
 #define TAG "UsbCcbApp"
 
-void usb_ccb_dialog_callback(DialogExResult result, void* context) {
-    furi_assert(context);
-    UsbCcb* app = context;
-    if(result == DialogExResultLeft) {
-        view_dispatcher_stop(app->view_dispatcher);
-    } else if(result == DialogExResultRight) {
-        view_dispatcher_switch_to_view(app->view_dispatcher, UsbCcbViewStart);
-    }
-}
-
-uint32_t usb_ccb_exit_confirm_view(void* context) {
-    UNUSED(context);
-    return UsbCcbViewExitConfirm;
-}
-
 uint32_t usb_ccb_exit(void* context) {
     UNUSED(context);
     return VIEW_NONE;
@@ -39,18 +24,9 @@ UsbCcb* usb_ccb_app_alloc() {
     view_dispatcher_enable_queue(app->view_dispatcher);
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
 
-    // Dialog view
-    app->dialog = dialog_ex_alloc();
-    dialog_ex_set_result_callback(app->dialog, usb_ccb_dialog_callback);
-    dialog_ex_set_context(app->dialog, app);
-    dialog_ex_set_left_button_text(app->dialog, "Exit");
-    dialog_ex_set_right_button_text(app->dialog, "Stay");
-    dialog_ex_set_header(app->dialog, "Exit?", 64, 11, AlignCenter, AlignTop);
-    view_dispatcher_add_view(app->view_dispatcher, UsbCcbViewExitConfirm, dialog_ex_get_view(app->dialog));
-
     // Start view
     app->usb_ccb_start = usb_ccb_start_alloc();
-    view_set_previous_callback(usb_ccb_start_get_view(app->usb_ccb_start), usb_ccb_exit_confirm_view);
+    view_set_previous_callback(usb_ccb_start_get_view(app->usb_ccb_start), usb_ccb_exit);
     view_dispatcher_add_view(app->view_dispatcher, UsbCcbViewStart, usb_ccb_start_get_view(app->usb_ccb_start));
 
     view_dispatcher_switch_to_view(app->view_dispatcher, UsbCcbViewStart);
@@ -65,8 +41,6 @@ void usb_ccb_app_free(UsbCcb* app) {
     notification_internal_message(app->notifications, &sequence_reset_blue);
 
     // Free views
-    view_dispatcher_remove_view(app->view_dispatcher, UsbCcbViewExitConfirm);
-    dialog_ex_free(app->dialog);
     view_dispatcher_remove_view(app->view_dispatcher, UsbCcbViewStart);
     usb_ccb_start_free(app->usb_ccb_start);
     view_dispatcher_free(app->view_dispatcher);
