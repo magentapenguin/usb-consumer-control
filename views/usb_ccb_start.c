@@ -393,58 +393,6 @@ HID_CONSUMER hidConsumerArray[] = {
 
 const int hidConsumerArraySize = sizeof(hidConsumerArray) / sizeof(hidConsumerArray[0]);
 
-void strrev(char* arr, int start, int end) {
-    char temp;
-
-    if (start >= end)
-        return;
-
-    temp = *(arr + start);
-    *(arr + start) = *(arr + end);
-    *(arr + end) = temp;
-
-    start++;
-    end--;
-    strrev(arr, start, end);
-}
-
-char *itoa(int number, char *arr, int base){
-    int i = 0, r, negative = 0;
-
-    if (number == 0)
-    {
-        arr[i] = '0';
-        arr[i + 1] = '\0';
-        return arr;
-    }
-
-    if (number < 0 && base == 10)
-    {
-        number *= -1;
-        negative = 1;
-    }
-
-    while (number != 0)
-    {
-        r = number % base;
-        arr[i] = (r > 9) ? (r - 10) + 'a' : r + '0';
-        i++;
-        number /= base;
-    }
-
-    if (negative)
-    {
-        arr[i] = '-';
-        i++;
-    }
-
-    strrev(arr, 0, i - 1);
-
-    arr[i] = '\0';
-
-    return arr;
-}
-
 // Function to convert a single hex digit to its character representation
 char hexDigitToChar(uint8_t digit) {
     if (digit < 10) {
@@ -471,9 +419,6 @@ void uint16ToHexString(uint16_t value, char* hexString) {
     hexString[startIndex] = '\0';
 }
 
-bool is_running = false;
-uint32_t autofire_delay = 1000;
-char autofire_delay_str[12];
 char hexString[7];
 
 // Start at the Application Launch Buttons by default, since that's the most interesting
@@ -541,45 +486,20 @@ const char* getConsumerSubsetName(int i) {
 // This is the main program loop
 static void usb_ccb_start_draw_callback(Canvas* canvas, void* context) {
     furi_assert(context);
-    itoa(autofire_delay, autofire_delay_str, 10);
     uint16ToHexString(hidConsumerArray[i].value, hexString);
 
     canvas_clear(canvas);
 
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 0, 10, is_running ? "Running" : "Not running");
+    canvas_draw_str(canvas, 0, 10, "USB Consumer Control");
 
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 0, 24, "Delay [ms]: ");
-    canvas_draw_str(canvas, 50, 24, autofire_delay_str);
+    canvas_draw_str(canvas, 0, 28, "Current key subset:");
+    canvas_draw_str(canvas, 0, 36, getConsumerSubsetName(i));
 
-    canvas_draw_str(canvas, 0, 38, "Current key subset:");
-    canvas_draw_str(canvas, 0, 46, getConsumerSubsetName(i));
-
-    canvas_draw_str(canvas, 0, 56, is_running ? "Sent:                HID_CONSUMER_" : "Next:                HID_CONSUMER_");
-    canvas_draw_str(canvas, 24, 56, hexString);
-    canvas_draw_str(canvas, 0, 64, hidConsumerArray[i].name);
-
-    if(is_running) {
-        uint16_t consumer_key = hidConsumerArray[i].value;
-        // Sending the consumer control button
-        furi_delay_us(autofire_delay * 500);
-        furi_hal_hid_consumer_key_press(consumer_key);
-        furi_delay_us(2000); // Hold the key pressed for a short amount of time
-        
-        // Stop sending the consumer control button
-        furi_hal_hid_consumer_key_release(consumer_key);
-        furi_delay_us(autofire_delay * 500);
-
-        // Cycle onto next consumer control button
-        i += 1;
-
-        // Stop once we've cycled all consumer control buttons
-        if(i == hidConsumerArraySize){
-            i = 0; 
-            is_running = false;
-        }
-    }
+    canvas_draw_str(canvas, 0, 50, "Press [ok] to send:");
+    canvas_draw_str(canvas, 0, 58, hexString);
+    canvas_draw_str(canvas, 30, 58, hidConsumerArray[i].name);
 }
 
 // This function is the controller
@@ -605,17 +525,13 @@ static void usb_ccb_start_process(UsbCcbStart* usb_ccb_start, InputEvent* event)
                 } else if(event->key == InputKeyLeft) {
                     model->left_pressed = true;
                     i = (i - 1 + hidConsumerArraySize) % hidConsumerArraySize;
-                } else if(event->key == InputKeyDown) {
-                    model->down_pressed = true;
-                    if(autofire_delay > 0) {
-                            autofire_delay -= 100;
-                    }
-                } else if(event->key == InputKeyUp) {
-                    model->up_pressed = true;
-                    autofire_delay += 100;
                 } else if(event->key == InputKeyOk) {
                     model->ok_pressed = true;
-                    is_running = !is_running;
+                    // Send the current consumer control code once
+                    uint16_t consumer_key = hidConsumerArray[i].value;
+                    furi_hal_hid_consumer_key_press(consumer_key);
+                    furi_delay_us(2000);
+                    furi_hal_hid_consumer_key_release(consumer_key);
                 } else if(event->key == InputKeyBack) {
                     model->back_pressed = true;
                 }
